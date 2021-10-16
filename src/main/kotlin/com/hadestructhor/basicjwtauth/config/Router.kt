@@ -5,8 +5,8 @@ object Router {
 
     const val TEST = "$API/test"
     const val USER = "$TEST/user"
-    const val MODS = "$TEST/mods"
-    const val ADMINS = "$TEST/admins"
+    const val MODS = "$TEST/mod"
+    const val ADMINS = "$TEST/admin"
 
     const val AUTH = "$API/auth"
     const val SIGNUP = "$AUTH/signup"

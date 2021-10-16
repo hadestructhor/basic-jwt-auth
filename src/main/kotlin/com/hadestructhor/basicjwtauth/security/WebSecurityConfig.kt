@@ -3,6 +3,7 @@ package com.hadestructhor.basicjwtauth.security
 import com.hadestructhor.basicjwtauth.config.Router
 import com.hadestructhor.basicjwtauth.security.jwt.AuthEntryPointJwt
 import com.hadestructhor.basicjwtauth.security.jwt.AuthTokenFilter
+import com.hadestructhor.basicjwtauth.security.jwt.JwtUtils
 import com.hadestructhor.basicjwtauth.services.UserDetailsServiceImplementation
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Bean
@@ -23,16 +24,14 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 @EnableGlobalMethodSecurity(prePostEnabled = true)
-class WebSecurityConfig(
-        @Autowired
+class WebSecurityConfig @Autowired constructor(
         val userDetailsService: UserDetailsServiceImplementation,
-        @Autowired
-        val unauthorizedHandler: AuthEntryPointJwt
-
+        val unauthorizedHandler: AuthEntryPointJwt,
+        val jwtUtils: JwtUtils
 ): WebSecurityConfigurerAdapter() {
     @Bean
     fun authenticationJwtTokenFilter(): AuthTokenFilter? {
-        return AuthTokenFilter()
+        return AuthTokenFilter(jwtUtils, userDetailsService)
     }
 
     @Throws(Exception::class)
@@ -59,6 +58,8 @@ class WebSecurityConfig(
                 .authorizeRequests()
                 .antMatchers(Router.SIGNIN).permitAll()
                 .antMatchers(Router.SIGNUP).permitAll()
+                .antMatchers("${Router.AUTH}/**").permitAll()
+                .antMatchers("${Router.TEST}/**").permitAll()
                 .anyRequest().authenticated()
         http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter::class.java)
     }

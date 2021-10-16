@@ -37,6 +37,7 @@ class JwtUtils {
 
     fun validateJwtToken(authToken: String?): Boolean {
         try {
+            println(authToken)
             Jwts.parserBuilder().setSigningKey(jwtSecret).build().parseClaimsJws(authToken)
             return true
         } catch (e: MalformedJwtException) {

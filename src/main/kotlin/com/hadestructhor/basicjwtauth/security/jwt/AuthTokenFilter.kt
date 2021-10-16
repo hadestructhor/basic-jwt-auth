@@ -7,6 +7,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource
+import org.springframework.stereotype.Component
 import org.springframework.util.StringUtils
 import org.springframework.web.filter.OncePerRequestFilter
 import java.io.IOException
@@ -15,12 +16,9 @@ import javax.servlet.ServletException
 import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
 
-
-class AuthTokenFilter(
-        @Autowired
-        val jwtUtils: JwtUtils? = null,
-        @Autowired
-        val userDetailsService: UserDetailsServiceImplementation? = null
+class AuthTokenFilter @Autowired constructor(
+        private val jwtUtils: JwtUtils,
+        private val userDetailsService: UserDetailsServiceImplementation
 
 ): OncePerRequestFilter() {
 
@@ -29,7 +27,7 @@ class AuthTokenFilter(
         try {
             val jwt = parseJwt(request)
             if (jwt != null && jwtUtils!!.validateJwtToken(jwt)) {
-                val username: String = jwtUtils.getUserNameFromJwtToken(jwt)
+                val username: String = jwtUtils!!.getUserNameFromJwtToken(jwt)
                 val userDetails: UserDetails = userDetailsService!!.loadUserByUsername(username)
                 val authentication = UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.authorities)
