@@ -1,14 +1,15 @@
 package com.hadestructhor.basicjwtauth.security.jwt
 
+import com.hadestructhor.basicjwtauth.models.User
+import com.hadestructhor.basicjwtauth.repositories.UserRepository
 import com.hadestructhor.basicjwtauth.security.UserDetailsImplementation
 import io.jsonwebtoken.*
+import io.jsonwebtoken.security.Keys
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.core.Authentication
 import org.springframework.stereotype.Component
-import io.jsonwebtoken.security.Keys;
-import org.slf4j.Logger
-import java.lang.Exception
 import java.security.Key
 import java.util.*
 
@@ -18,15 +19,20 @@ class JwtUtils {
     private val jwtSecret: Key = Keys.secretKeyFor(SignatureAlgorithm.HS512);
 
     @Value("\${security.jwt.expiration-time-ms}")
-    private val jwtExpirationMs = 86400000
+    private val jwtExpirationMs = 14400000
 
-    fun generateJwtToken(authentication: Authentication): String {
-        val userPrincipal: UserDetailsImplementation = authentication.principal as UserDetailsImplementation
+    @Autowired
+    lateinit var userRepository: UserRepository
+
+    fun generateJwtTokenFromUser(user: User): String {
         val date: Date = Date()
         return Jwts.builder()
-                .setSubject(userPrincipal.username)
+                .setSubject(user.username)
                 .setIssuedAt(date)
                 .setExpiration(Date(date.time + jwtExpirationMs))
+                .claim("userId", user.id)
+                .claim("email", user.email)
+                .claim("roles", user.roles)
                 .signWith(jwtSecret)
                 .compact()
     }
@@ -37,7 +43,6 @@ class JwtUtils {
 
     fun validateJwtToken(authToken: String?): Boolean {
         try {
-            println(authToken)
             Jwts.parserBuilder().setSigningKey(jwtSecret).build().parseClaimsJws(authToken)
             return true
         } catch (e: MalformedJwtException) {

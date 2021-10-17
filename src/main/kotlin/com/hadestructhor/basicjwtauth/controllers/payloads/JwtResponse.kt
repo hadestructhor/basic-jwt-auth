@@ -4,6 +4,7 @@ import com.hadestructhor.basicjwtauth.models.Role
 
 data class JwtResponse(
         var accessToken: String,
+        var refreshToken: String,
         var userId: Long,
         var username: String,
         var email: String?,

@@ -1,16 +1,16 @@
 package com.hadestructhor.basicjwtauth.controllers
 
 import com.hadestructhor.basicjwtauth.config.Router
-import com.hadestructhor.basicjwtauth.controllers.payloads.JwtResponse
-import com.hadestructhor.basicjwtauth.controllers.payloads.LoginRequest
-import com.hadestructhor.basicjwtauth.controllers.payloads.MessageResponse
-import com.hadestructhor.basicjwtauth.controllers.payloads.SignupRequest
+import com.hadestructhor.basicjwtauth.controllers.payloads.*
+import com.hadestructhor.basicjwtauth.exception.TokenRefreshException
 import com.hadestructhor.basicjwtauth.models.EnumRole
+import com.hadestructhor.basicjwtauth.models.RefreshToken
 import com.hadestructhor.basicjwtauth.models.User
 import com.hadestructhor.basicjwtauth.repositories.RoleRepository
 import com.hadestructhor.basicjwtauth.repositories.UserRepository
 import com.hadestructhor.basicjwtauth.security.UserDetailsImplementation
 import com.hadestructhor.basicjwtauth.security.jwt.JwtUtils
+import com.hadestructhor.basicjwtauth.services.RefreshTokenService
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.AuthenticationManager
@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
 
+
 @RestController
 class AuthController(
         @Autowired val authenticationManager: AuthenticationManager,
@@ -30,6 +31,7 @@ class AuthController(
         @Autowired val roleRepository: RoleRepository,
         @Autowired val encoder: PasswordEncoder,
         @Autowired val jwtUtils: JwtUtils,
+        @Autowired val refreshTokenService: RefreshTokenService
         ) {
 
     @PostMapping(Router.SIGNIN)
@@ -38,12 +40,16 @@ class AuthController(
             val authentication: Authentication = authenticationManager.authenticate(
                     UsernamePasswordAuthenticationToken(loginRequest.username, loginRequest.password))
             SecurityContextHolder.getContext().authentication = authentication
-            val jwt = jwtUtils.generateJwtToken(authentication)
 
             val userDetails: UserDetailsImplementation = authentication.principal as UserDetailsImplementation
             val user = userRepository.getById(userDetails.id)
+            val accessToken = jwtUtils.generateJwtTokenFromUser(user)
+            val refreshToken: RefreshToken = refreshTokenService.createRefreshToken(user.id)
+
             return ResponseEntity.ok(
-                    JwtResponse(jwt,
+                    JwtResponse(
+                        accessToken,
+                        refreshToken.token!!,
                         user.id,
                         user.username,
                         user.email,
@@ -83,15 +89,35 @@ class AuthController(
         val authentication: Authentication = authenticationManager.authenticate(
                 UsernamePasswordAuthenticationToken(user.username, signUpRequest.password))
         SecurityContextHolder.getContext().authentication = authentication
-        val jwt = jwtUtils.generateJwtToken(authentication)
+        val accessToken = jwtUtils.generateJwtTokenFromUser(user)
+
+        val refreshToken: RefreshToken = refreshTokenService.createRefreshToken(user.id)
 
         return ResponseEntity.ok(
-                JwtResponse(jwt,
+                JwtResponse(
+                        accessToken,
+                        refreshToken.token!!,
                         user.id,
                         user.username,
                         user.email,
                         user.roles)
         )
+    }
+
+    @PostMapping(Router.REFRESH_TOKEN)
+    fun refreshToken(@RequestBody request: TokenRefreshRequest): ResponseEntity<*>? {
+        val requestRefreshToken = request.refreshToken
+        return refreshTokenService.findByToken(requestRefreshToken)
+                .map(refreshTokenService::verifyExpiration)
+                .map(RefreshToken::user)
+                .map { user ->
+                    val token: String = jwtUtils.generateJwtTokenFromUser(user!!)
+                    ResponseEntity.ok(TokenRefreshResponse(token, requestRefreshToken))
+                }
+                .orElseThrow {
+                    TokenRefreshException(requestRefreshToken,
+                            "Refresh token is not in database!")
+                }
     }
 
 }

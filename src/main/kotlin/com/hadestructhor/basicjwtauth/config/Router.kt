@@ -11,6 +11,7 @@ object Router {
     const val AUTH = "$API/auth"
     const val SIGNUP = "$AUTH/signup"
     const val SIGNIN = "$AUTH/signin"
+    const val REFRESH_TOKEN = "$AUTH/refreshtoken"
 
 
 }
