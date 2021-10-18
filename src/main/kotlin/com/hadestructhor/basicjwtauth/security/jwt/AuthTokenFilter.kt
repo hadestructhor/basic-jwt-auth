@@ -16,19 +16,20 @@ import javax.servlet.ServletException
 import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
 
-class AuthTokenFilter @Autowired constructor(
-        private val jwtUtils: JwtUtils,
-        private val userDetailsService: UserDetailsServiceImplementation
+class AuthTokenFilter: OncePerRequestFilter() {
 
-): OncePerRequestFilter() {
+    @Autowired
+    private lateinit var jwtUtils: JwtUtils
+    @Autowired
+    private lateinit var userDetailsService: UserDetailsServiceImplementation
 
     @Throws(ServletException::class, IOException::class)
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) {
         try {
             val jwt = parseJwt(request)
-            if (jwt != null && jwtUtils!!.validateJwtToken(jwt)) {
-                val username: String = jwtUtils!!.getUserNameFromJwtToken(jwt)
-                val userDetails: UserDetails = userDetailsService!!.loadUserByUsername(username)
+            if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
+                val username: String = jwtUtils.getUserNameFromJwtToken(jwt)
+                val userDetails: UserDetails = userDetailsService.loadUserByUsername(username)
                 val authentication = UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.authorities)
                 authentication.details = WebAuthenticationDetailsSource().buildDetails(request)
@@ -41,10 +42,7 @@ class AuthTokenFilter @Autowired constructor(
     }
 
     private fun parseJwt(request: HttpServletRequest): String? {
-        val headerAuth = request.getHeader("Authorization")
-        return if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
-            headerAuth.substring(7, headerAuth.length)
-        } else null
+        return request.getHeader("jwt-access-token")
     }
 
     companion object {

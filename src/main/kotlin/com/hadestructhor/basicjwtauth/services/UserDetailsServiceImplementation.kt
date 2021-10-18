@@ -10,7 +10,8 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
-class UserDetailsServiceImplementation(@Autowired var userRepository: UserRepository) : UserDetailsService {
+class UserDetailsServiceImplementation : UserDetailsService {
+    @Autowired private lateinit var userRepository: UserRepository
     @Transactional
     override fun loadUserByUsername(username: String): UserDetails {
         val user = userRepository.findByUsername(username)

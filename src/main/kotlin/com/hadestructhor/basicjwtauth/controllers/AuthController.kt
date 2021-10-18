@@ -2,15 +2,12 @@ package com.hadestructhor.basicjwtauth.controllers
 
 import com.hadestructhor.basicjwtauth.config.Router
 import com.hadestructhor.basicjwtauth.controllers.payloads.*
-import com.hadestructhor.basicjwtauth.exception.TokenRefreshException
 import com.hadestructhor.basicjwtauth.models.EnumRole
-import com.hadestructhor.basicjwtauth.models.RefreshToken
 import com.hadestructhor.basicjwtauth.models.User
 import com.hadestructhor.basicjwtauth.repositories.RoleRepository
 import com.hadestructhor.basicjwtauth.repositories.UserRepository
 import com.hadestructhor.basicjwtauth.security.UserDetailsImplementation
 import com.hadestructhor.basicjwtauth.security.jwt.JwtUtils
-import com.hadestructhor.basicjwtauth.services.RefreshTokenService
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.AuthenticationManager
@@ -25,14 +22,13 @@ import org.springframework.web.bind.annotation.RestController
 
 
 @RestController
-class AuthController(
-        @Autowired val authenticationManager: AuthenticationManager,
-        @Autowired val userRepository: UserRepository,
-        @Autowired val roleRepository: RoleRepository,
-        @Autowired val encoder: PasswordEncoder,
-        @Autowired val jwtUtils: JwtUtils,
-        @Autowired val refreshTokenService: RefreshTokenService
-        ) {
+class AuthController {
+
+    @Autowired private lateinit var authenticationManager: AuthenticationManager
+    @Autowired private lateinit var userRepository: UserRepository
+    @Autowired private lateinit var roleRepository: RoleRepository
+    @Autowired private lateinit var encoder: PasswordEncoder
+    @Autowired private lateinit var jwtUtils: JwtUtils
 
     @PostMapping(Router.SIGNIN)
     fun signin(@RequestBody loginRequest: LoginRequest): ResponseEntity<*> {
@@ -44,12 +40,12 @@ class AuthController(
             val userDetails: UserDetailsImplementation = authentication.principal as UserDetailsImplementation
             val user = userRepository.getById(userDetails.id)
             val accessToken = jwtUtils.generateJwtTokenFromUser(user)
-            val refreshToken: RefreshToken = refreshTokenService.createRefreshToken(user.id)
+            val refreshToken = jwtUtils.generateRefreshTokenFromUser(user)
 
             return ResponseEntity.ok(
                     JwtResponse(
                         accessToken,
-                        refreshToken.token!!,
+                        refreshToken,
                         user.id,
                         user.username,
                         user.email,
@@ -91,12 +87,12 @@ class AuthController(
         SecurityContextHolder.getContext().authentication = authentication
         val accessToken = jwtUtils.generateJwtTokenFromUser(user)
 
-        val refreshToken: RefreshToken = refreshTokenService.createRefreshToken(user.id)
+        val refreshToken = jwtUtils.generateRefreshTokenFromUser(user)
 
         return ResponseEntity.ok(
                 JwtResponse(
                         accessToken,
-                        refreshToken.token!!,
+                        refreshToken,
                         user.id,
                         user.username,
                         user.email,
@@ -105,19 +101,28 @@ class AuthController(
     }
 
     @PostMapping(Router.REFRESH_TOKEN)
-    fun refreshToken(@RequestBody request: TokenRefreshRequest): ResponseEntity<*>? {
-        val requestRefreshToken = request.refreshToken
-        return refreshTokenService.findByToken(requestRefreshToken)
-                .map(refreshTokenService::verifyExpiration)
-                .map(RefreshToken::user)
-                .map { user ->
-                    val token: String = jwtUtils.generateJwtTokenFromUser(user!!)
-                    ResponseEntity.ok(TokenRefreshResponse(token, requestRefreshToken))
-                }
-                .orElseThrow {
-                    TokenRefreshException(requestRefreshToken,
-                            "Refresh token is not in database!")
-                }
+    fun refreshToken(@RequestBody requestRefreshToken: RefreshTokenRequest): ResponseEntity<*>? {
+        try {
+            if (jwtUtils.validateJwtRefreshToken(requestRefreshToken.refreshToken)) {
+                val user: User = userRepository.getById(jwtUtils.getUserIdFromRefreshToken(requestRefreshToken.refreshToken))
+                val accessToken = jwtUtils.generateJwtTokenFromUser(user)
+                val refreshToken = jwtUtils.generateRefreshTokenFromUser(user)
+                return ResponseEntity.ok(
+                        JwtResponse(
+                                accessToken,
+                                refreshToken,
+                                user.id,
+                                user.username,
+                                user.email,
+                                user.roles)
+                )
+            }
+        } catch (e: Exception) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(MessageResponse("Error: ${e.message}"))
+        }
+        return null
     }
 
 }
